@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="User dashboard — Secure Auth System">
+    <title>Dashboard — Secure Auth</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+    <!-- Animated background orbs -->
+    <div class="bg-orbs"></div>
+
+    <!-- Mobile sidebar toggle -->
+    <button class="mobile-toggle" id="mobile-toggle">☰</button>
+
+    <div class="app-layout">
+
+        <!-- ── Sidebar ──────────────────────────────────────────── -->
+        <aside class="sidebar">
+            <div class="sidebar__brand">
+                <span class="sidebar__brand-icon">🔐</span>
+                <h2>
+                    Secure Auth
+                    <span>Dashboard</span>
+                </h2>
+            </div>
+
+            <nav class="sidebar__nav">
+                <a href="/dashboard.html" class="sidebar__nav-link" id="nav-dashboard">
+                    <span class="nav-icon">📊</span>
+                    Dashboard
+                </a>
+                <a href="/admin.html" class="sidebar__nav-link" id="nav-admin" style="display:none;">
+                    <span class="nav-icon">🛡️</span>
+                    Admin Panel
+                </a>
+
+                <div class="sidebar__spacer"></div>
+
+                <a href="#" class="sidebar__nav-link" id="btn-logout">
+                    <span class="nav-icon">🚪</span>
+                    Sign Out
+                </a>
+            </nav>
+
+            <div class="sidebar__footer">
+                <div class="sidebar__user">
+                    <div class="sidebar__avatar" id="sidebar-avatar">?</div>
+                    <div class="sidebar__user-info">
+                        <div class="sidebar__user-name" id="sidebar-user-name">Loading...</div>
+                        <div class="sidebar__user-role" id="sidebar-user-role">—</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ── Main Content ─────────────────────────────────────── -->
+        <main class="main-content">
+
+            <!-- Session status bar -->
+            <div class="session-bar">
+                <span class="session-bar__dot"></span>
+                Session active — expires in <span class="session-bar__time" id="session-time">--:--</span>
+            </div>
+
+            <!-- Page Header -->
+            <div class="main-content__header">
+                <h1 id="welcome-heading">Welcome back!</h1>
+                <p>Here's your account overview</p>
+            </div>
+
+            <!-- Stats Cards -->
+            <div class="card-grid">
+                <div class="card">
+                    <div class="card__icon">👤</div>
+                    <div class="card__title">Username</div>
+                    <div class="card__value" id="card-username">—</div>
+                </div>
+
+                <div class="card">
+                    <div class="card__icon">📧</div>
+                    <div class="card__title">Email</div>
+                    <div class="card__value" id="card-email">—</div>
+                </div>
+
+                <div class="card">
+                    <div class="card__icon">🎭</div>
+                    <div class="card__title">Account Role</div>
+                    <div class="card__value" id="card-role">—</div>
+                </div>
+
+                <div class="card">
+                    <div class="card__icon">✅</div>
+                    <div class="card__title">Auth Status</div>
+                    <div class="card__value card__value--accent">Authenticated</div>
+                    <div class="card__detail">JWT token is valid</div>
+                </div>
+            </div>
+
+            <!-- Account Details Table -->
+            <div class="info-card">
+                <div class="info-card__title">📋 Account Details</div>
+                <table class="info-table">
+                    <tr>
+                        <td>User ID</td>
+                        <td id="detail-id">—</td>
+                    </tr>
+                    <tr>
+                        <td>Username</td>
+                        <td id="detail-username">—</td>
+                    </tr>
+                    <tr>
+                        <td>Email</td>
+                        <td id="detail-email">—</td>
+                    </tr>
+                    <tr>
+                        <td>Role</td>
+                        <td id="detail-role">—</td>
+                    </tr>
+                    <tr>
+                        <td>Authentication</td>
+                        <td>Bearer Token (JWT)</td>
+                    </tr>
+                    <tr>
+                        <td>Token Expiry</td>
+                        <td>1 hour from login</td>
+                    </tr>
+                </table>
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/js/api.js"></script>
+    <script src="/js/app.js"></script>
+    <script>
+        // ── Page Guard ─────────────────────────────────────────────
+        const user = App.requireAuth();
+        if (!user) {
+            // requireAuth already redirects — halt execution
+            throw new Error('Redirecting to login');
+        }
+
+        // ── Initialize Sidebar & Session Timer ─────────────────────
+        App.initSidebar();
+        App.startSessionTimer();
+
+        // ── Populate Dashboard from API ────────────────────────────
+        async function loadDashboard() {
+            try {
+                const data = await API.get('/api/dashboard');
+
+                if (data._ok && data.success) {
+                    const u = data.user;
+
+                    // Welcome heading
+                    document.getElementById('welcome-heading').textContent =
+                        `Welcome back, ${u.username}!`;
+
+                    // Cards
+                    document.getElementById('card-username').textContent = u.username;
+                    document.getElementById('card-email').textContent = u.email;
+
+                    const roleEl = document.getElementById('card-role');
+                    roleEl.innerHTML = u.role === 'admin'
+                        ? '<span class="badge badge-admin">🛡️ Admin</span>'
+                        : '<span class="badge badge-user">👤 User</span>';
+
+                    // Details table
+                    document.getElementById('detail-id').textContent = u.id;
+                    document.getElementById('detail-username').textContent = u.username;
+                    document.getElementById('detail-email').textContent = u.email;
+
+                    const detailRoleEl = document.getElementById('detail-role');
+                    detailRoleEl.innerHTML = u.role === 'admin'
+                        ? '<span class="badge badge-admin">🛡️ Admin</span>'
+                        : '<span class="badge badge-user">👤 User</span>';
+
+                } else {
+                    App.showToast('error', 'Failed to Load', data.error || 'Could not load dashboard data');
+                }
+
+            } catch (err) {
+                App.showToast('error', 'Network Error', 'Could not connect to the server');
+            }
+        }
+
+        loadDashboard();
+    </script>
+
+</body>
+</html>

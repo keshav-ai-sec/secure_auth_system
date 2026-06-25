@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sign in to Secure Auth System — JWT authentication with role-based access control">
+    <title>Sign In — Secure Auth</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+    <!-- Animated background orbs -->
+    <div class="bg-orbs"></div>
+
+    <div class="auth-container">
+        <div class="auth-card">
+
+            <!-- Logo / Branding -->
+            <div class="auth-card__logo">
+                <span class="auth-card__logo-icon">🔐</span>
+                <h1>Secure Auth</h1>
+                <p>Sign in to your account</p>
+            </div>
+
+            <!-- Login Form -->
+            <form id="login-form" novalidate>
+
+                <!-- Email Field -->
+                <div class="form-group">
+                    <label for="email">Email Address</label>
+                    <div class="input-wrapper">
+                        <input
+                            type="email"
+                            id="email"
+                            name="email"
+                            placeholder="you@example.com"
+                            autocomplete="email"
+                            required
+                        >
+                        <span class="input-icon">📧</span>
+                    </div>
+                    <span class="field-error" id="email-error"></span>
+                </div>
+
+                <!-- Password Field -->
+                <div class="form-group">
+                    <label for="password">Password</label>
+                    <div class="input-wrapper">
+                        <input
+                            type="password"
+                            id="password"
+                            name="password"
+                            placeholder="Enter your password"
+                            autocomplete="current-password"
+                            required
+                        >
+                        <span class="input-icon">🔑</span>
+                        <button type="button" class="toggle-password" id="toggle-password" aria-label="Toggle password visibility">
+                            👁️
+                        </button>
+                    </div>
+                    <span class="field-error" id="password-error"></span>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="btn btn-primary" id="btn-login">
+                    <span class="spinner"></span>
+                    <span class="btn-text">Sign In →</span>
+                </button>
+
+            </form>
+
+            <!-- Footer -->
+            <div class="auth-card__footer">
+                Don't have an account? <a href="/register.html">Create one</a>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/js/api.js"></script>
+    <script src="/js/app.js"></script>
+    <script>
+        // ── Page Init ──────────────────────────────────────────────
+        // If already logged in, skip to dashboard
+        App.redirectIfLoggedIn();
+
+        // Check if redirected here due to session expiry
+        App.checkExpiredParam();
+
+        // ── DOM References ─────────────────────────────────────────
+        const form = document.getElementById('login-form');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const btn = document.getElementById('btn-login');
+        const toggleBtn = document.getElementById('toggle-password');
+
+        // ── Password Visibility Toggle ─────────────────────────────
+        toggleBtn.addEventListener('click', () => {
+            const isPassword = passwordInput.type === 'password';
+            passwordInput.type = isPassword ? 'text' : 'password';
+            toggleBtn.textContent = isPassword ? '🙈' : '👁️';
+        });
+
+        // ── Client-Side Validation ─────────────────────────────────
+        function validateForm() {
+            let valid = true;
+
+            // Email
+            const emailErr = document.getElementById('email-error');
+            if (!emailInput.value.trim()) {
+                emailErr.textContent = 'Email is required';
+                emailErr.classList.add('visible');
+                emailInput.classList.add('input-error');
+                valid = false;
+            } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailInput.value)) {
+                emailErr.textContent = 'Please enter a valid email';
+                emailErr.classList.add('visible');
+                emailInput.classList.add('input-error');
+                valid = false;
+            } else {
+                emailErr.classList.remove('visible');
+                emailInput.classList.remove('input-error');
+            }
+
+            // Password
+            const passErr = document.getElementById('password-error');
+            if (!passwordInput.value) {
+                passErr.textContent = 'Password is required';
+                passErr.classList.add('visible');
+                passwordInput.classList.add('input-error');
+                valid = false;
+            } else {
+                passErr.classList.remove('visible');
+                passwordInput.classList.remove('input-error');
+            }
+
+            return valid;
+        }
+
+        // Clear error on input
+        [emailInput, passwordInput].forEach(input => {
+            input.addEventListener('input', () => {
+                const errEl = document.getElementById(input.id + '-error');
+                errEl.classList.remove('visible');
+                input.classList.remove('input-error');
+            });
+        });
+
+        // ── Form Submission ────────────────────────────────────────
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            if (!validateForm()) return;
+
+            App.setLoading(btn, true);
+
+            try {
+                const data = await API.post('/api/auth/login', {
+                    email: emailInput.value.trim(),
+                    password: passwordInput.value,
+                });
+
+                if (data._ok && data.success) {
+                    // Save token and user data
+                    API.setToken(data.token);
+                    API.setUser(data.user);
+
+                    App.showToast('success', 'Welcome back!', `Signed in as ${data.user.username}`);
+
+                    // Redirect based on role
+                    setTimeout(() => {
+                        if (data.user.role === 'admin') {
+                            window.location.href = '/admin.html';
+                        } else {
+                            window.location.href = '/dashboard.html';
+                        }
+                    }, 800);
+                } else {
+                    // Handle specific error codes
+                    if (data._status === 423) {
+                        App.showToast('error', 'Account Locked', data.error);
+                    } else if (data._status === 429) {
+                        App.showToast('warning', 'Rate Limited', data.error);
+                    } else if (data.errors && data.errors.length) {
+                        data.errors.forEach(err => {
+                            App.showToast('error', 'Validation Error', err.msg);
+                        });
+                    } else {
+                        App.showToast('error', 'Login Failed', data.error || 'Invalid credentials');
+                    }
+                    App.setLoading(btn, false);
+                }
+
+            } catch (err) {
+                App.showToast('error', 'Network Error', 'Could not reach the server. Is it running?');
+                App.setLoading(btn, false);
+            }
+        });
+    </script>
+
+</body>
+</html>

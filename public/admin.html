@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Admin panel — Secure Auth System (restricted to admin role)">
+    <title>Admin Panel — Secure Auth</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/css/styles.css">
+</head>
+<body>
+
+    <!-- Animated background orbs -->
+    <div class="bg-orbs"></div>
+
+    <!-- Mobile sidebar toggle -->
+    <button class="mobile-toggle" id="mobile-toggle">☰</button>
+
+    <div class="app-layout">
+
+        <!-- ── Sidebar ──────────────────────────────────────────── -->
+        <aside class="sidebar">
+            <div class="sidebar__brand">
+                <span class="sidebar__brand-icon">🔐</span>
+                <h2>
+                    Secure Auth
+                    <span>Admin Panel</span>
+                </h2>
+            </div>
+
+            <nav class="sidebar__nav">
+                <a href="/dashboard.html" class="sidebar__nav-link" id="nav-dashboard">
+                    <span class="nav-icon">📊</span>
+                    Dashboard
+                </a>
+                <a href="/admin.html" class="sidebar__nav-link" id="nav-admin">
+                    <span class="nav-icon">🛡️</span>
+                    Admin Panel
+                </a>
+
+                <div class="sidebar__spacer"></div>
+
+                <a href="#" class="sidebar__nav-link" id="btn-logout">
+                    <span class="nav-icon">🚪</span>
+                    Sign Out
+                </a>
+            </nav>
+
+            <div class="sidebar__footer">
+                <div class="sidebar__user">
+                    <div class="sidebar__avatar" id="sidebar-avatar">?</div>
+                    <div class="sidebar__user-info">
+                        <div class="sidebar__user-name" id="sidebar-user-name">Loading...</div>
+                        <div class="sidebar__user-role" id="sidebar-user-role">—</div>
+                    </div>
+                </div>
+            </div>
+        </aside>
+
+        <!-- ── Main Content ─────────────────────────────────────── -->
+        <main class="main-content">
+
+            <!-- Session status bar -->
+            <div class="session-bar">
+                <span class="session-bar__dot"></span>
+                Session active — expires in <span class="session-bar__time" id="session-time">--:--</span>
+            </div>
+
+            <!-- Page content will be injected here -->
+            <div id="admin-content">
+                <!-- Shows either the admin panel or access denied -->
+            </div>
+
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="/js/api.js"></script>
+    <script src="/js/app.js"></script>
+    <script>
+        // ── Page Guard — Auth Required ─────────────────────────────
+        const user = App.requireAuth();
+        if (!user) {
+            throw new Error('Redirecting to login');
+        }
+
+        // ── Initialize Sidebar & Session Timer ─────────────────────
+        App.initSidebar();
+        App.startSessionTimer();
+
+        const contentEl = document.getElementById('admin-content');
+
+        // ── Attempt to Load Admin Data ─────────────────────────────
+        async function loadAdminPanel() {
+            try {
+                const data = await API.get('/api/admin');
+
+                if (data._ok && data.success) {
+                    // ── Success: User IS an admin ──────────────────
+                    contentEl.innerHTML = `
+                        <div class="main-content__header">
+                            <h1>🛡️ Admin Panel</h1>
+                            <p>Restricted area — admin-only access</p>
+                        </div>
+
+                        <div class="card-grid">
+                            <div class="card">
+                                <div class="card__icon">🛡️</div>
+                                <div class="card__title">Access Level</div>
+                                <div class="card__value">
+                                    <span class="badge badge-admin">🛡️ Admin</span>
+                                </div>
+                                <div class="card__detail">Full system access granted</div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card__icon">🔑</div>
+                                <div class="card__title">Admin ID</div>
+                                <div class="card__value card__value--accent" style="font-size:0.95rem;">${data.adminId}</div>
+                            </div>
+
+                            <div class="card">
+                                <div class="card__icon">🔒</div>
+                                <div class="card__title">Security</div>
+                                <div class="card__value card__value--accent">Active</div>
+                                <div class="card__detail">RBAC middleware verified</div>
+                            </div>
+                        </div>
+
+                        <div class="info-card">
+                            <div class="info-card__title">⚙️ System Security Status</div>
+                            <table class="info-table">
+                                <tr>
+                                    <td>Authentication</td>
+                                    <td>JWT (Bearer Token)</td>
+                                </tr>
+                                <tr>
+                                    <td>Authorization</td>
+                                    <td>Role-Based Access Control (RBAC)</td>
+                                </tr>
+                                <tr>
+                                    <td>Password Storage</td>
+                                    <td>bcrypt (10 salt rounds)</td>
+                                </tr>
+                                <tr>
+                                    <td>Brute Force Protection</td>
+                                    <td>Rate limiting + Account lockout</td>
+                                </tr>
+                                <tr>
+                                    <td>Security Headers</td>
+                                    <td>Helmet (CSP, HSTS, X-Content-Type)</td>
+                                </tr>
+                                <tr>
+                                    <td>Input Validation</td>
+                                    <td>express-validator (server-side)</td>
+                                </tr>
+                            </table>
+                        </div>
+                    `;
+
+                    App.showToast('success', 'Admin Access', 'Welcome to the admin panel');
+
+                } else if (data._status === 403) {
+                    // ── Forbidden: User is NOT an admin ────────────
+                    showAccessDenied();
+
+                } else {
+                    App.showToast('error', 'Error', data.error || 'Failed to load admin panel');
+                    showAccessDenied();
+                }
+
+            } catch (err) {
+                App.showToast('error', 'Network Error', 'Could not connect to the server');
+            }
+        }
+
+        function showAccessDenied() {
+            contentEl.innerHTML = `
+                <div class="access-denied">
+                    <div class="access-denied__icon">🚫</div>
+                    <h2 class="access-denied__title">Access Denied</h2>
+                    <p class="access-denied__message">
+                        Your account role is <span class="badge badge-user">👤 User</span>.
+                        This page requires <span class="badge badge-admin">🛡️ Admin</span> privileges.
+                    </p>
+                    <a href="/dashboard.html" class="btn btn-outline">← Back to Dashboard</a>
+                </div>
+            `;
+            App.showToast('warning', 'Access Denied', 'You need admin privileges to view this page');
+        }
+
+        loadAdminPanel();
+    </script>
+
+</body>
+</html>
